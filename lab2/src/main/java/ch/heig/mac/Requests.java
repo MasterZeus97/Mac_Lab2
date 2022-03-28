@@ -37,9 +37,10 @@ public class Requests {
     }
 
     public List<Record> possibleSpreadCounts() {
-        var dbVisualizationQuery = "match(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)<-[vH:VISITS]-(pH:Person{healthstatus: 'Healthy'})\n" +
-                "where vH.starttime > pSick.confirmedtime and vSick.starttime > pSick.confirmedtime\n" +
-                "return distinct pSick.name as sickName, size(collect(distinct pH.name)) as nbHealthy";
+        var dbVisualizationQuery =
+                "MATCH(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)<-[vH:VISITS]-(pH:Person{healthstatus: 'Healthy'})\n" +
+                "WHERE vH.starttime > pSick.confirmedtime AND vSick.starttime > pSick.confirmedtime\n" +
+                "RETURN distinct pSick.name as sickName, size(collect(distinct pH.name)) as nbHealthy";
 
         try (var session = driver.session()) {
             var result = session.run(dbVisualizationQuery);
@@ -63,14 +64,15 @@ public class Requests {
     }
 
     public List<Record> sociallyCareful() {
-        var dbVisualizationQuery = "match(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)\n" +
-                "where vSick.starttime > pSick.confirmedtime\n" +
-                "with collect(distinct pSick) as sickeWithBar\n" +
-                "match (p:Person{healthstatus: 'Sick'})\n" +
-                "with collect(distinct p) as sickPeople, sickeWithBar\n" +
-                "with apoc.coll.subtract(sickPeople, sickeWithBar) as sickWithoutBar\n" +
-                "unwind sickWithoutBar as tmp\n" +
-                "return tmp.name as sickName";
+        var dbVisualizationQuery =
+                "MATCH(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)\n" +
+                "WHERE vSick.starttime > pSick.confirmedtime\n" +
+                "WITH collect(distinct pSick) AS sickeWithBar\n" +
+                "MATCH (p:Person{healthstatus: 'Sick'})\n" +
+                "WITH collect(distinct p) AS sickPeople, sickeWithBar\n" +
+                "WITH apoc.coll.subtract(sickPeople, sickeWithBar) AS sickWithoutBar\n" +
+                "UNWIND sickWithoutBar AS tmp\n" +
+                "RETURN tmp.name AS sickName";
 
         try (var session = driver.session()) {
             var result = session.run(dbVisualizationQuery);
@@ -79,9 +81,12 @@ public class Requests {
     }
 
     public List<Record> peopleToInform() {
-        var dbVisualizationQuery = "match(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)<-[vH:VISITS]-(pH:Person{healthstatus: 'Healthy'})\n" +
-                "where vSick.starttime > pSick.confirmedtime and vH.endtime > vSick.starttime and datetime() + duration.inSeconds(apoc.coll.max([vSick.starttime, vH.starttime]), apoc.coll.min([vSick.endtime, vH.endtime])) >= datetime() + duration(\"PT2H\")\n" +
-                "return distinct pSick.name as sickName, collect(pH.name) as peopleToInform";
+        var dbVisualizationQuery =
+                "MATCH(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)<-[vH:VISITS]-(pH:Person{healthstatus: 'Healthy'})\n" +
+                "WHERE vSick.starttime > pSick.confirmedtime\n"+
+                "AND vH.endtime > vSick.starttime\n"+
+                "AND datetime() + duration.inSeconds(apoc.coll.max([vSick.starttime, vH.starttime]), apoc.coll.min([vSick.endtime, vH.endtime])) >= datetime() + duration(\"PT2H\")\n" +
+                "RETURN distinct pSick.name AS sickName, collect(pH.name) AS peopleToInform";
 
         try (var session = driver.session()) {
             var result = session.run(dbVisualizationQuery);
@@ -90,12 +95,15 @@ public class Requests {
     }
 
     public List<Record> setHighRisk() {
-        var dbVisualizationQuery = "match(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)<-[vH:VISITS]-(pH:Person{healthstatus: 'Healthy'})\n" +
-                "where vSick.starttime > pSick.confirmedtime and vH.endtime > vSick.starttime and datetime() + duration.inSeconds(apoc.coll.max([vSick.starttime, vH.starttime]), apoc.coll.min([vSick.endtime, vH.endtime])) >= datetime() + duration(\"PT2H\")\n" +
-                "with pSick.name as malade, collect(pH) as persons\n" +
-                "unwind persons as listOfRisk\n" +
-                "foreach(n in persons | set n.risk = \"high\")\n" +
-                "return distinct listOfRisk.name as highRiskName";
+        var dbVisualizationQuery =
+                "MATCH(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)<-[vH:VISITS]-(pH:Person{healthstatus: 'Healthy'})\n" +
+                "WHERE vSick.starttime > pSick.confirmedtime\n"+
+                "AND vH.endtime > vSick.starttime\n"+
+                "AND datetime() + duration.inSeconds(apoc.coll.max([vSick.starttime, vH.starttime]), apoc.coll.min([vSick.endtime, vH.endtime])) >= datetime() + duration(\"PT2H\")\n" +
+                "WITH pSick.name as malade, collect(pH) as persons\n" +
+                "UNWIND persons as listOfRisk\n" +
+                "FOREACH(n in persons | set n.risk = \"high\")\n" +
+                "RETURN distinct listOfRisk.name AS highRiskName";
 
         try (var session = driver.session()) {
             var result = session.run(dbVisualizationQuery);
@@ -105,16 +113,16 @@ public class Requests {
 
     public List<Record> healthyCompanionsOf(String name) {
         var dbVisualizationQuery =
-                "match(p:Person{name:$name})-[v:VISITS]->(k:Place)<-[u:VISITS]-(o:Person{healthstatus: 'Healthy'})\n" +
-                "with collect(distinct o) as oc\n" +
-                "unwind oc as ou\n" +
-                "match(ou)-[v:VISITS]->(k:Place)<-[u:VISITS]-(o:Person{healthstatus: 'Healthy'})\n" +
-                "with collect(distinct o) as occ\n" +
-                "unwind occ as ouu\n" +
-                "match(ouu)-[v:VISITS]->(k:Place)<-[u:VISITS]-(o:Person{healthstatus: 'Healthy'})\n" +
-                "with collect(distinct o) as occc\n" +
-                "unwind occc as ouuu\n" +
-                "return ouuu.name AS healthyName";
+                "MATCH(p:Person{name:$name})-[v:VISITS]->(k:Place)<-[u:VISITS]-(o:Person{healthstatus: 'Healthy'})\n" +
+                "WITH collect(distinct o) AS oc\n" +
+                "UNWIND oc AS ou\n" +
+                "MATCH(ou)-[v:VISITS]->(k:Place)<-[u:VISITS]-(o:Person{healthstatus: 'Healthy'})\n" +
+                "WITH collect(distinct o) AS occ\n" +
+                "UNWIND occ AS ouu\n" +
+                "MATCH(ouu)-[v:VISITS]->(k:Place)<-[u:VISITS]-(o:Person{healthstatus: 'Healthy'})\n" +
+                "WITH collect(distinct o) AS occc\n" +
+                "UNWIND occc AS ouuu\n" +
+                "RETURN ouuu.name AS healthyName";
         Map<String,Object> params = new HashMap<>();
         params.put( "name", name );
 
@@ -125,11 +133,12 @@ public class Requests {
     }
 
     public Record topSickSite() {
-        var dbVisualizationQuery = "match(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)\n" +
-                "with place, size(collect(distinct pSick)) as nbOfSickVisits\n" +
-                "return place.type as placeType, nbOfSickVisits\n" +
-                "order by nbOfSickVisits desc\n" +
-                "limit 1";
+        var dbVisualizationQuery =
+                "MATCH(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)\n" +
+                "WITH place, size(collect(distinct pSick)) AS nbOfSickVisits\n" +
+                "RETURN place.type AS placeType, nbOfSickVisits\n" +
+                "ORDER BY nbOfSickVisits desc\n" +
+                "LIMIT 1";
 
         try (var session = driver.session()) {
             var result = session.run(dbVisualizationQuery);
