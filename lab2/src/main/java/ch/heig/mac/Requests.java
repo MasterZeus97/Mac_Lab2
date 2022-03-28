@@ -24,11 +24,25 @@ public class Requests {
     }
 
     public List<Record> possibleSpreaders() {
-        throw new UnsupportedOperationException("Not implemented, yet");
+        var dbVisualizationQuery = "match(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)<-[vH:VISITS]-(pH:Person{healthstatus: 'Healthy'})\n" +
+                "where vH.starttime > pSick.confirmedtime and vSick.starttime > pSick.confirmedtime\n" +
+                "return distinct pSick.name as sickName";
+
+        try (var session = driver.session()) {
+            var result = session.run(dbVisualizationQuery);
+            return result.list();
+        }
     }
 
     public List<Record> possibleSpreadCounts() {
-        throw new UnsupportedOperationException("Not implemented, yet");
+        var dbVisualizationQuery = "match(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)<-[vH:VISITS]-(pH:Person{healthstatus: 'Healthy'})\n" +
+                "where vH.starttime > pSick.confirmedtime and vSick.starttime > pSick.confirmedtime\n" +
+                "return distinct pSick.name as sickName, size(collect(distinct pH.name)) as nbHealthy";
+
+        try (var session = driver.session()) {
+            var result = session.run(dbVisualizationQuery);
+            return result.list();
+        }
     }
 
     public List<Record> carelessPeople() {
@@ -36,15 +50,44 @@ public class Requests {
     }
 
     public List<Record> sociallyCareful() {
-        throw new UnsupportedOperationException("Not implemented, yet");
+        var dbVisualizationQuery = "match(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)\n" +
+                "where vSick.starttime > pSick.confirmedtime\n" +
+                "with collect(distinct pSick) as sickeWithBar\n" +
+                "match (p:Person{healthstatus: 'Sick'})\n" +
+                "with collect(distinct p) as sickPeople, sickeWithBar\n" +
+                "with apoc.coll.subtract(sickPeople, sickeWithBar) as sickWithoutBar\n" +
+                "unwind sickWithoutBar as tmp\n" +
+                "return tmp.name as sickName";
+
+        try (var session = driver.session()) {
+            var result = session.run(dbVisualizationQuery);
+            return result.list();
+        }
     }
 
     public List<Record> peopleToInform() {
-        throw new UnsupportedOperationException("Not implemented, yet");
+        var dbVisualizationQuery = "match(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)<-[vH:VISITS]-(pH:Person{healthstatus: 'Healthy'})\n" +
+                "where vSick.starttime > pSick.confirmedtime and vH.endtime > vSick.starttime and datetime() + duration.inSeconds(apoc.coll.max([vSick.starttime, vH.starttime]), apoc.coll.min([vSick.endtime, vH.endtime])) >= datetime() + duration(\"PT2H\")\n" +
+                "return distinct pSick.name as sickName, collect(pH.name) as peopleToInform";
+
+        try (var session = driver.session()) {
+            var result = session.run(dbVisualizationQuery);
+            return result.list();
+        }
     }
 
     public List<Record> setHighRisk() {
-        throw new UnsupportedOperationException("Not implemented, yet");
+        var dbVisualizationQuery = "match(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)<-[vH:VISITS]-(pH:Person{healthstatus: 'Healthy'})\n" +
+                "where vSick.starttime > pSick.confirmedtime and vH.endtime > vSick.starttime and datetime() + duration.inSeconds(apoc.coll.max([vSick.starttime, vH.starttime]), apoc.coll.min([vSick.endtime, vH.endtime])) >= datetime() + duration(\"PT2H\")\n" +
+                "with pSick.name as malade, collect(pH) as persons\n" +
+                "unwind persons as listOfRisk\n" +
+                "foreach(n in persons | set n.risk = \"high\")\n" +
+                "return distinct listOfRisk.name as highRiskName";
+
+        try (var session = driver.session()) {
+            var result = session.run(dbVisualizationQuery);
+            return result.list();
+        }
     }
 
     public List<Record> healthyCompanionsOf(String name) {
@@ -52,7 +95,16 @@ public class Requests {
     }
 
     public Record topSickSite() {
-        throw new UnsupportedOperationException("Not implemented, yet");
+        var dbVisualizationQuery = "match(pSick:Person{healthstatus: 'Sick'})-[vSick:VISITS]->(place:Place)\n" +
+                "with place, size(collect(distinct pSick)) as nbOfSickVisits\n" +
+                "return place.type as placeType, nbOfSickVisits\n" +
+                "order by nbOfSickVisits desc\n" +
+                "limit 1";
+
+        try (var session = driver.session()) {
+            var result = session.run(dbVisualizationQuery);
+            return result.single();
+        }
     }
 
     public List<Record> sickFrom(List<String> names) {
