@@ -1,6 +1,8 @@
 package ch.heig.mac;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.neo4j.driver.*;
@@ -46,7 +48,18 @@ public class Requests {
     }
 
     public List<Record> carelessPeople() {
-        throw new UnsupportedOperationException("Not implemented, yet");
+        var dbVisualizationQuery =
+                "MATCH (n:Person{healthstatus:'Sick'})-[v:VISITS]-(p:Place)\n" +
+                "WHERE v.starttime > n.confirmedtime\n" +
+                "WITH n, size(collect(p.name)) AS nbPlaces\n" +
+                "WHERE nbPlaces > 10\n" +
+                "RETURN n.name AS sickName, nbPlaces\n" +
+                "ORDER BY nbPlaces";
+
+        try (var session = driver.session()) {
+            var result = session.run(dbVisualizationQuery);
+            return result.list();
+        }
     }
 
     public List<Record> sociallyCareful() {
@@ -91,7 +104,24 @@ public class Requests {
     }
 
     public List<Record> healthyCompanionsOf(String name) {
-        throw new UnsupportedOperationException("Not implemented, yet");
+        var dbVisualizationQuery =
+                "match(p:Person{name:$name})-[v:VISITS]->(k:Place)<-[u:VISITS]-(o:Person{healthstatus: 'Healthy'})\n" +
+                "with collect(distinct o) as oc\n" +
+                "unwind oc as ou\n" +
+                "match(ou)-[v:VISITS]->(k:Place)<-[u:VISITS]-(o:Person{healthstatus: 'Healthy'})\n" +
+                "with collect(distinct o) as occ\n" +
+                "unwind occ as ouu\n" +
+                "match(ouu)-[v:VISITS]->(k:Place)<-[u:VISITS]-(o:Person{healthstatus: 'Healthy'})\n" +
+                "with collect(distinct o) as occc\n" +
+                "unwind occc as ouuu\n" +
+                "return ouuu.name AS healthyName";
+        Map<String,Object> params = new HashMap<>();
+        params.put( "name", name );
+
+        try (var session = driver.session()) {
+            var result = session.run(dbVisualizationQuery, params);
+            return result.list();
+        }
     }
 
     public Record topSickSite() {
@@ -108,6 +138,16 @@ public class Requests {
     }
 
     public List<Record> sickFrom(List<String> names) {
-        throw new UnsupportedOperationException("Not implemented, yet");
+        var dbVisualizationQuery =
+                "MATCH (per:Person{healthstatus:'Sick'})\n" +
+                "WHERE per.name IN $lst " +
+                "RETURN per.name AS sickName";
+        Map<String,Object> params = new HashMap<>();
+        params.put( "lst", names );
+
+        try (var session = driver.session()) {
+            var result = session.run(dbVisualizationQuery, params);
+            return result.list();
+        }
     }
 }
